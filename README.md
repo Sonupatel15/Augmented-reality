@@ -59,5 +59,3 @@ This will launch the Streamlit UI in your browser. 🚀
 - Use Uvicorn for running the backend.
 - Improve object tracking and rendering.
 
----
-Made with ❤️ using OpenCV and Streamlit.
