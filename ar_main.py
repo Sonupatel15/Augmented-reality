@@ -4,10 +4,15 @@
 # import os
 # from objloader_simple import OBJ
 
-# MIN_MATCHES = 10  
+# # Constants
+# MIN_MATCHES = 10
+# REFERENCE_IMAGE_PATH = 'reference/rich.jpg'  # Path to your reference image
+# MODEL_PATH = 'models/rat.obj'  # Default 3D model path
+# IMAGE_PATH = 'media/rich.jpg'  # Default image path
+# VIDEO_PATH = 'media/sample_video.mp4'  # Default video path
 
-# def render(frame, obj, projection, model):
-#     """ Renders a 3D object onto the frame using homography projection. """
+# def render(frame, obj, projection, model, texture=None):
+#     """Renders a 3D object onto the frame using homography projection."""
 #     vertices = obj.vertices
 #     scale_matrix = np.eye(3) * 3
 #     h, w = model.shape
@@ -26,7 +31,7 @@
 #     return frame
 
 # def projection_matrix(camera_matrix, homography):
-#     """ Computes the 3D projection matrix from the homography. """
+#     """Computes the 3D projection matrix from the homography."""
 #     homography *= -1
 #     rt_matrix = np.dot(np.linalg.inv(camera_matrix), homography)
 
@@ -47,62 +52,100 @@
 #     return np.dot(camera_matrix, projection)
 
 # def overlay_image(frame, homography, overlay):
-#     """ Overlays an image onto the reference object using perspective transform. """
+#     """Overlays an image onto the frame using homography."""
 #     h, w, _ = overlay.shape
-#     ref_pts = np.float32([[0, 0], [w, 0], [w, h], [0, h]]).reshape(-1, 1, 2)
-#     dst_pts = cv2.perspectiveTransform(ref_pts, homography)
-#     matrix = cv2.getPerspectiveTransform(ref_pts, dst_pts)
-#     warped_overlay = cv2.warpPerspective(overlay, matrix, (frame.shape[1], frame.shape[0]))
-    
+#     corners = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
+#     transformed_corners = cv2.perspectiveTransform(corners, homography)
+
+#     matrix = cv2.getPerspectiveTransform(np.float32(corners), np.float32(transformed_corners))
+#     warped = cv2.warpPerspective(overlay, matrix, (frame.shape[1], frame.shape[0]))
+
 #     mask = np.zeros_like(frame, dtype=np.uint8)
-#     cv2.fillPoly(mask, [np.int32(dst_pts)], (255, 255, 255))
+#     cv2.fillPoly(mask, [np.int32(transformed_corners)], (255, 255, 255))
 #     frame = cv2.bitwise_and(frame, cv2.bitwise_not(mask))
-#     frame = cv2.add(frame, warped_overlay)
-    
+#     frame = cv2.add(frame, warped)
 #     return frame
 
-# def overlay_video(frame, homography, video_cap):
-#     """ Overlays a video onto the reference object using perspective transform. """
-#     ret, video_frame = video_cap.read()
-#     if not ret:
-#         video_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Restart video
-#         ret, video_frame = video_cap.read()
+# def main(selected_type="3D"):  # selected_type can be "3D", "IMAGE", or "VIDEO"
+#     cap = cv2.VideoCapture(0)
+#     reference_image = cv2.imread(REFERENCE_IMAGE_PATH, 0)
     
-#     return overlay_image(frame, homography, video_frame)
+#     if selected_type == "3D":
+#         obj = OBJ(MODEL_PATH, swapyz=True)
+#     elif selected_type == "IMAGE":
+#         overlay = cv2.imread(IMAGE_PATH)
+#     elif selected_type == "VIDEO":
+#         video_cap = cv2.VideoCapture(VIDEO_PATH)
 
-# def process_frame(frame, homography, overlay_type, obj, model, photo=None, video_cap=None):
-#     """ Processes the frame based on overlay type. """
-#     if homography is None:
-#         return frame
+#     orb = cv2.ORB_create(nfeatures=5000)
+#     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    
+#     kp_model, des_model = orb.detectAndCompute(reference_image, None)
+#     camera_params = np.array([[800, 0, 320], [0, 800, 240], [0, 0, 1]])
 
-#     camera_matrix = np.array([[800, 0, 320], [0, 800, 240], [0, 0, 1]])
-#     projection = projection_matrix(camera_matrix, homography)
+#     while True:
+#         ret, frame = cap.read()
+#         if not ret:
+#             print("Failed to grab frame")
+#             break
 
-#     if overlay_type == "Object (3D Model)" and obj:
-#         return render(frame, obj, projection, model)
+#         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#         kp_frame, des_frame = orb.detectAndCompute(gray_frame, None)
 
-#     elif overlay_type == "Photo" and photo is not None:
-#         return overlay_image(frame, homography, photo)
+#         if des_frame is not None and len(des_frame) > 0:
+#             matches = bf.match(des_model, des_frame)
+#             matches = sorted(matches, key=lambda x: x.distance)
 
-#     elif overlay_type == "Video" and video_cap is not None:
-#         return overlay_video(frame, homography, video_cap)
+#             if len(matches) > MIN_MATCHES:
+#                 src_pts = np.float32([kp_model[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+#                 dst_pts = np.float32([kp_frame[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+                
+#                 homography, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
 
-#     return frame
+#                 if homography is not None:
+#                     projection = projection_matrix(camera_params, homography)
+
+#                     if selected_type == "3D":
+#                         frame = render(frame, obj, projection, reference_image)
+#                     elif selected_type == "IMAGE":
+#                         frame = overlay_image(frame, homography, overlay)
+#                     elif selected_type == "VIDEO":
+#                         ret_video, video_frame = video_cap.read()
+#                         if ret_video:
+#                             frame = overlay_image(frame, homography, video_frame)
+
+#                     h, w = reference_image.shape
+#                     corners = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
+#                     corners_transformed = cv2.perspectiveTransform(corners, homography)
+#                     frame = cv2.polylines(frame, [np.int32(corners_transformed)], True, (0, 255, 0), 2)
+
+#         cv2.imshow('AR Wedding Card', frame)
+#         if cv2.waitKey(1) == 27:
+#             break
+
+#     cap.release()
+#     cv2.destroyAllWindows()
+#     if selected_type == "VIDEO":
+#         video_cap.release()
+
+# if __name__ == "__main__":
+#     main("3D")  # Change to "IMAGE" or "VIDEO" based on frontend selection
 
 import cv2
 import numpy as np
 import math
 import os
 from objloader_simple import OBJ
+from utils import overlay_image  # Import overlay function from utils.py
 
 # Constants
 MIN_MATCHES = 10
-REFERENCE_IMAGE_PATH = 'reference/rich.jpg'  # Path to your reference image
-MODEL_PATH = 'models/rat.obj'  # Default 3D model path
-IMAGE_PATH = 'media/rich.jpg'  # Default image path
-VIDEO_PATH = 'media/sample_video.mp4'  # Default video path
+REFERENCE_IMAGE_PATH = 'reference/rich.jpg'  # Path to reference image
+MODEL_PATH = 'models/rat.obj'  # 3D model path
+IMAGE_PATH = 'reference/cult.jpg'  # Image overlay path
+VIDEO_PATH = 'media/sample_video.mp4'  # Video overlay path
 
-def render(frame, obj, projection, model, texture=None):
+def render(frame, obj, projection, model):
     """Renders a 3D object onto the frame using homography projection."""
     vertices = obj.vertices
     scale_matrix = np.eye(3) * 3
@@ -142,22 +185,7 @@ def projection_matrix(camera_matrix, homography):
     projection = np.stack((rot_1, rot_2, rot_3, translation)).T
     return np.dot(camera_matrix, projection)
 
-def overlay_image(frame, homography, overlay):
-    """Overlays an image onto the frame using homography."""
-    h, w, _ = overlay.shape
-    corners = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
-    transformed_corners = cv2.perspectiveTransform(corners, homography)
-
-    matrix = cv2.getPerspectiveTransform(np.float32(corners), np.float32(transformed_corners))
-    warped = cv2.warpPerspective(overlay, matrix, (frame.shape[1], frame.shape[0]))
-
-    mask = np.zeros_like(frame, dtype=np.uint8)
-    cv2.fillPoly(mask, [np.int32(transformed_corners)], (255, 255, 255))
-    frame = cv2.bitwise_and(frame, cv2.bitwise_not(mask))
-    frame = cv2.add(frame, warped)
-    return frame
-
-def main(selected_type="3D"):  # selected_type can be "3D", "IMAGE", or "VIDEO"
+def main(selected_type="3D"):  # Can be "3D", "IMAGE", or "VIDEO"
     cap = cv2.VideoCapture(0)
     reference_image = cv2.imread(REFERENCE_IMAGE_PATH, 0)
     
@@ -199,11 +227,11 @@ def main(selected_type="3D"):  # selected_type can be "3D", "IMAGE", or "VIDEO"
                     if selected_type == "3D":
                         frame = render(frame, obj, projection, reference_image)
                     elif selected_type == "IMAGE":
-                        frame = overlay_image(frame, homography, overlay)
+                        frame = overlay_image(frame, homography, overlay)  # Using function from utils.py
                     elif selected_type == "VIDEO":
                         ret_video, video_frame = video_cap.read()
                         if ret_video:
-                            frame = overlay_image(frame, homography, video_frame)
+                            frame = overlay_image(frame, homography, video_frame)  # Using function from utils.py
 
                     h, w = reference_image.shape
                     corners = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
@@ -211,7 +239,7 @@ def main(selected_type="3D"):  # selected_type can be "3D", "IMAGE", or "VIDEO"
                     frame = cv2.polylines(frame, [np.int32(corners_transformed)], True, (0, 255, 0), 2)
 
         cv2.imshow('AR Wedding Card', frame)
-        if cv2.waitKey(1) == 27:
+        if cv2.waitKey(1) == 27:  # Press ESC to exit
             break
 
     cap.release()

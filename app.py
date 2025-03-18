@@ -1,326 +1,21 @@
-# import streamlit as st
-# import cv2
-# import numpy as np
-# import os
-# import sys
-# import time
-# import io
-# from PIL import Image
-# from datetime import datetime
-
-# # Append the src directory to sys.path so we can import ar_main.py
-# sys.path.append(os.path.join(os.getcwd(), "src"))
-
-# from objloader_simple import OBJ
-# from ar_main import render, projection_matrix
-
-# # Page configuration and styling
-# st.set_page_config(
-#     page_title="AR Vision",
-#     page_icon="🔮",
-#     layout="wide"
-# )
-
-# # Custom CSS for better styling
-# st.markdown("""
-# <style>
-#     .main-header {
-#         font-size: 2.5rem;
-#         color: #4A56E2;
-#         margin-bottom: 0.5rem;
-#     }
-#     .sub-header {
-#         font-size: 1.2rem;
-#         color: #6C757D;
-#         margin-bottom: 2rem;
-#     }
-#     .card {
-#         background-color: #f8f9fa;
-#         border-radius: 10px;
-#         padding: 20px;
-#         margin-bottom: 20px;
-#         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-#     }
-#     .stButton>button {
-#         background-color: #4A56E2;
-#         color: white;
-#         font-weight: bold;
-#         padding: 0.5rem 1rem;
-#         border-radius: 5px;
-#     }
-#     .stButton>button:hover {
-#         background-color: #3A46C2;
-#     }
-#     .gallery-image {
-#         border-radius: 5px;
-#         margin: 5px;
-#         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-#     }
-# </style>
-# """, unsafe_allow_html=True)
-
-# # App header
-# st.markdown('<h1 class="main-header">AR Vision Explorer</h1>', unsafe_allow_html=True)
-# st.markdown('<p class="sub-header">Interactive Augmented Reality Experience</p>', unsafe_allow_html=True)
-
-# # Initialize session state variables
-# if 'captured_images' not in st.session_state:
-#     st.session_state.captured_images = []
-# if 'current_model' not in st.session_state:
-#     st.session_state.current_model = "rat.obj"
-# if 'current_reference' not in st.session_state:
-#     st.session_state.current_reference = "rich.jpg"
-# if 'camera_active' not in st.session_state:
-#     st.session_state.camera_active = False
-# if 'show_match_points' not in st.session_state:
-#     st.session_state.show_match_points = False
-# if 'min_matches' not in st.session_state:
-#     st.session_state.min_matches = 10
-
-# # Function to start the camera and run AR processing
-# def start_camera():
-#     MIN_MATCHES = st.session_state.min_matches
-    
-#     # Camera settings and configuration
-#     camera_parameters = np.array([[800, 0, 320], [0, 800, 240], [0, 0, 1]])
-#     orb = cv2.BRISK_create()
-#     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-#     dir_name = os.getcwd()
-    
-#     model_path = os.path.join(dir_name, "reference", st.session_state.current_reference)
-#     obj_path = os.path.join(dir_name, "models", st.session_state.current_model)
-    
-#     if not os.path.exists(model_path) or not os.path.exists(obj_path):
-#         st.error(f"Model or reference image not found! Looking for:\n{model_path}\n{obj_path}")
-#         return
-    
-#     model = cv2.imread(model_path, 0)
-#     kp_model, des_model = orb.detectAndCompute(model, None)
-#     obj = OBJ(obj_path, swapyz=True)
-    
-#     cap = cv2.VideoCapture(0)
-    
-#     if not cap.isOpened():
-#         st.error("Could not open webcam")
-#         return
-    
-#     stframe = st.empty()  # Placeholder for displaying frames
-#     status_text = st.empty()  # Placeholder for status text
-    
-#     while st.session_state.camera_active:
-#         ret, frame = cap.read()
-#         if not ret:
-#             st.error("Unable to capture video")
-#             break
-        
-#         frame_display = frame.copy()
-#         kp_frame, des_frame = orb.detectAndCompute(frame, None)
-        
-#         if des_frame is not None:
-#             matches = bf.match(des_model, des_frame)
-#             matches = sorted(matches, key=lambda x: x.distance)
-            
-#             # Display match count status
-#             status_text.text(f"Detected matches: {len(matches)}/{MIN_MATCHES} required")
-            
-#             if len(matches) > MIN_MATCHES:
-#                 src_pts = np.float32([kp_model[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-#                 dst_pts = np.float32([kp_frame[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-#                 homography, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-                
-#                 if homography is not None:
-#                     try:
-#                         projection = projection_matrix(camera_parameters, homography)
-#                         frame_display = render(frame_display, obj, projection, model)
-#                     except Exception as e:
-#                         status_text.error(f"Error in rendering: {e}")
-                        
-#             # Optionally display match points
-#             if st.session_state.show_match_points and len(matches) > 0:
-#                 match_display = cv2.drawMatches(
-#                     model, kp_model, 
-#                     frame, kp_frame, 
-#                     matches[:10], None,
-#                     flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
-#                 )
-#                 frame_display = match_display
-        
-#         frame_rgb = cv2.cvtColor(frame_display, cv2.COLOR_BGR2RGB)
-#         stframe.image(frame_rgb, channels="RGB", use_column_width=True)
-        
-#         if cv2.waitKey(1) & 0xFF == ord('q'):
-#             break
-    
-#     cap.release()
-#     cv2.destroyAllWindows()
-#     status_text.empty()
-#     stframe.empty()
-#     st.session_state.camera_active = False
-
-# # Function to capture an image
-# def capture_image():
-#     cap = cv2.VideoCapture(0)
-#     if not cap.isOpened():
-#         st.error("Could not open webcam")
-#         return
-    
-#     # Countdown
-#     for i in range(3, 0, -1):
-#         st.text(f"Capturing in {i}...")
-#         time.sleep(1)
-    
-#     ret, frame = cap.read()
-#     cap.release()
-    
-#     if ret:
-#         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-#         image_path = f"captured_{timestamp}.jpg"
-        
-#         # Save image to session state
-#         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-#         pil_img = Image.fromarray(frame_rgb)
-#         st.session_state.captured_images.append((pil_img, timestamp))
-        
-#         # Save to disk
-#         if not os.path.exists("captures"):
-#             os.makedirs("captures")
-#         pil_img.save(os.path.join("captures", image_path))
-        
-#         st.success(f"Image captured and saved!")
-#     else:
-#         st.error("Failed to capture image")
-
-# # Main UI layout with sidebar
-# with st.sidebar:
-#     st.markdown('<div class="card">', unsafe_allow_html=True)
-#     st.subheader("📊 Control Panel")
-    
-#     # Model selection
-#     st.markdown("### 3D Model Selection")
-#     models = ["rat.obj", "fox.obj", "dragon.obj"]  # Add your available models here
-#     st.session_state.current_model = st.selectbox("Choose 3D Model", models, index=0)
-    
-#     # Reference image selection
-#     st.markdown("### Reference Image")
-#     references = ["rich.jpg", "marker.jpg", "table.jpg"]  # Add your available references here
-#     st.session_state.current_reference = st.selectbox("Choose Reference Image", references, index=0)
-    
-#     # AR Settings
-#     st.markdown("### AR Settings")
-#     st.session_state.min_matches = st.slider("Minimum Matches", 5, 50, 10)
-#     st.session_state.show_match_points = st.checkbox("Show Match Points", False)
-    
-#     # Camera controls
-#     st.markdown("### Camera Controls")
-#     col1, col2 = st.columns(2)
-    
-#     with col1:
-#         if not st.session_state.camera_active:
-#             if st.button("Start Camera", key="start"):
-#                 st.session_state.camera_active = True
-#         else:
-#             if st.button("Stop Camera", key="stop"):
-#                 st.session_state.camera_active = False
-    
-#     with col2:
-#         if st.button("Capture Image"):
-#             capture_image()
-    
-#     st.markdown('</div>', unsafe_allow_html=True)
-
-# # Main content area
-# st.markdown('<div class="card">', unsafe_allow_html=True)
-
-# # Camera view and feature display
-# if st.session_state.camera_active:
-#     start_camera()
-# else:
-#     st.markdown("### Click 'Start Camera' to begin the AR experience")
-#     st.markdown("Use the control panel on the left to adjust settings and capture images.")
-
-# st.markdown('</div>', unsafe_allow_html=True)
-
-# # Gallery of captured images
-# if st.session_state.captured_images:
-#     st.markdown('<div class="card">', unsafe_allow_html=True)
-#     st.markdown("## 📸 Captured Images Gallery")
-    
-#     # Display images in a grid
-#     cols = st.columns(3)
-#     for i, (img, timestamp) in enumerate(st.session_state.captured_images):
-#         with cols[i % 3]:
-#             st.image(img, caption=f"Captured: {timestamp}", use_column_width=True)
-            
-#             # Option to delete image
-#             if st.button(f"Delete", key=f"del_{i}"):
-#                 del st.session_state.captured_images[i]
-#                 st.experimental_rerun()
-                
-#             # Option to download image
-#             img_bytes = io.BytesIO()
-#             img.save(img_bytes, format="JPEG")
-#             st.download_button(
-#                 label="Download",
-#                 data=img_bytes.getvalue(),
-#                 file_name=f"ar_capture_{timestamp}.jpg",
-#                 mime="image/jpeg",
-#                 key=f"download_{i}"
-#             )
-    
-#     # Clear all images button
-#     if st.button("Clear All Images"):
-#         st.session_state.captured_images = []
-#         st.experimental_rerun()
-        
-#     st.markdown('</div>', unsafe_allow_html=True)
-
-# # Information and help section
-# with st.expander("ℹ️ How to Use This AR Application"):
-#     st.markdown("""
-#     ### Getting Started with AR Vision Explorer
-    
-#     1. **Select a 3D model and reference image** from the sidebar
-#     2. **Click 'Start Camera'** to begin the AR experience
-#     3. **Show the reference image** to your camera to see the 3D model appear
-#     4. **Adjust the settings** to improve detection if needed
-#     5. **Capture images** to save your AR moments
-    
-#     ### Troubleshooting
-    
-#     - Make sure your reference images are in the `reference` folder
-#     - Make sure your 3D models are in the `models` folder
-#     - If detection is poor, try adjusting the minimum matches slider
-#     - Ensure good lighting conditions for better marker detection
-#     """)
-
-# # Footer
-# st.markdown("""
-# <div style="text-align: center; margin-top: 30px; padding: 10px; color: #6C757D; font-size: 0.8rem;">
-#     AR Vision Explorer | Created with Streamlit and OpenCV
-# </div>
-# """, unsafe_allow_html=True)
-
-
 import streamlit as st
 import cv2
 import numpy as np
 import os
 import sys
 import time
-import io
+import tempfile
 from PIL import Image
 from datetime import datetime
 
-# Append the src directory to sys.path so we can import ar_main.py
-sys.path.append(os.path.join(os.getcwd(), "src"))
-
+# Import AR backend functionality
 from objloader_simple import OBJ
-from ar_main import render, projection_matrix
+from ar_main import render, projection_matrix, overlay_image, MIN_MATCHES
 
 # Page configuration and styling
 st.set_page_config(
-    page_title="AR Vision",
-    page_icon="🔮",
+    page_title="AR Wedding Card Experience",
+    page_icon="💍",
     layout="wide"
 )
 
@@ -329,13 +24,15 @@ st.markdown("""
 <style>
     .main-header {
         font-size: 2.5rem;
-        color: #4A56E2;
+        color: #FF4B8B;
         margin-bottom: 0.5rem;
+        text-align: center;
     }
     .sub-header {
         font-size: 1.2rem;
         color: #6C757D;
         margin-bottom: 2rem;
+        text-align: center;
     }
     .card {
         background-color: #f8f9fa;
@@ -345,159 +42,413 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     .stButton>button {
-        background-color: #4A56E2;
+        background-color: #FF4B8B;
         color: white;
         font-weight: bold;
         padding: 0.5rem 1rem;
         border-radius: 5px;
+        width: 100%;
     }
     .stButton>button:hover {
-        background-color: #3A46C2;
+        background-color: #E3407C;
+    }
+    .capture-btn {
+        background-color: #20C997;
+    }
+    .stSelectbox label, .stSlider label {
+        font-weight: bold;
+        color: #444;
+    }
+    .view-container {
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        padding: 10px;
+        background-color: #f0f0f0;
+    }
+    .gallery-image {
+        border-radius: 5px;
+        margin: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
 </style>
 """, unsafe_allow_html=True)
 
 # App header
-st.markdown('<h1 class="main-header">AR Vision Explorer</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Interactive Augmented Reality Experience</p>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">AR Wedding Card Experience</h1>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Create magical wedding memories with augmented reality</p>', unsafe_allow_html=True)
 
 # Initialize session state variables
 if 'camera_active' not in st.session_state:
     st.session_state.camera_active = False
 if 'min_matches' not in st.session_state:
     st.session_state.min_matches = 10
+if 'captured_images' not in st.session_state:
+    st.session_state.captured_images = []
+if 'overlay_type' not in st.session_state:
+    st.session_state.overlay_type = "3D"
+if 'temp_files' not in st.session_state:
+    st.session_state.temp_files = []
 
-# Sidebar dropdown for selecting overlay type
-st.markdown("### Overlay Type")
-overlay_type = st.selectbox("Choose Overlay Type", ["Object (3D Model)", "Photo", "Video"])
+# Create layout with two columns (sidebar and main content)
+col1, col2 = st.columns([1, 3])
 
-# Conditional options based on selection
-uploaded_photo = None
-uploaded_video = None
-
-if overlay_type == "Photo":
-    st.markdown("### Upload an Image")
-    uploaded_photo = st.file_uploader("Upload an Image for Overlay", type=["jpg", "png", "jpeg"])
-
-elif overlay_type == "Video":
-    st.markdown("### Upload a Video")
-    uploaded_video = st.file_uploader("Upload a Video for Overlay", type=["mp4", "avi", "mov"])
-
-# Store selections in session state
-st.session_state.overlay_type = overlay_type
-st.session_state.uploaded_photo = uploaded_photo
-st.session_state.uploaded_video = uploaded_video
-
-# Model selection
-st.markdown("### 3D Model Selection")
-models = ["rat.obj", "fox.obj", "dragon.obj"]
-selected_model = st.selectbox("Choose 3D Model", models, index=0)
-
-# Reference image selection
-st.markdown("### Reference Image")
-references = ["rich.jpg", "marker.jpg", "table.jpg"]
-selected_reference = st.selectbox("Choose Reference Image", references, index=0)
-
-st.session_state.current_model = selected_model
-st.session_state.current_reference = selected_reference
-
-# AR Settings
-st.markdown("### AR Settings")
-st.session_state.min_matches = st.slider("Minimum Matches", 5, 50, 10)
-
-# Function to start the camera and run AR processing
-def start_camera():
-    MIN_MATCHES = st.session_state.min_matches
+# Sidebar with controls
+with col1:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("📱 Control Panel")
     
-    camera_parameters = np.array([[800, 0, 320], [0, 800, 240], [0, 0, 1]])
-    orb = cv2.BRISK_create()
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    dir_name = os.getcwd()
+    # Overlay selection
+    st.markdown("### Overlay Type")
+    overlay_type = st.selectbox("What would you like to display?", 
+                                ["3D", "IMAGE", "VIDEO"], 
+                                key="overlay_selector")
+    st.session_state.overlay_type = overlay_type
     
-    model_path = os.path.join(dir_name, "reference", st.session_state.current_reference)
-    obj_path = os.path.join(dir_name, "models", st.session_state.current_model)
+    # Reference image selection
+    st.markdown("### Reference Image")
+    reference_options = ["Upload your own"]
     
-    if not os.path.exists(model_path):
-        st.error(f"Reference image not found: {model_path}")
-        return
-
-    model = cv2.imread(model_path, 0)
-    kp_model, des_model = orb.detectAndCompute(model, None)
-
-    obj = None
-    if st.session_state.overlay_type == "Object (3D Model)" and os.path.exists(obj_path):
-        obj = OBJ(obj_path, swapyz=True)
+    # Check if reference_images directory exists and add files
+    if os.path.exists("reference_images"):
+        reference_files = [f for f in os.listdir("reference_images") 
+                          if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+        reference_options.extend(reference_files)
     
-    cap = cv2.VideoCapture(0)
+    reference_selection = st.selectbox("Select wedding card reference", 
+                                       reference_options,
+                                       index=0 if len(reference_options) > 0 else 0)
     
-    if not cap.isOpened():
-        st.error("Could not open webcam")
-        return
+    # Handle reference image upload
+    if reference_selection == "Upload your own":
+        uploaded_reference = st.file_uploader("Upload wedding card", 
+                                              type=["jpg", "jpeg", "png"],
+                                              key="reference_uploader")
+        if uploaded_reference is not None:
+            # Save uploaded reference to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_ref:
+                tmp_ref.write(uploaded_reference.read())
+                reference_path = tmp_ref.name
+                st.session_state.temp_files.append(reference_path)
+                st.session_state.reference_path = reference_path
+                st.image(reference_path, caption="Your reference image", width=200)
+    else:
+        st.session_state.reference_path = os.path.join("reference_images", reference_selection)
+        try:
+            st.image(st.session_state.reference_path, caption="Reference Image", width=200)
+        except:
+            st.error(f"Could not display reference image: {st.session_state.reference_path}")
     
-    stframe = st.empty()
-    status_text = st.empty()
-    
-    while st.session_state.camera_active:
-        ret, frame = cap.read()
-        if not ret:
-            st.error("Unable to capture video")
-            break
-
-        frame_display = frame.copy()
-        kp_frame, des_frame = orb.detectAndCompute(frame, None)
-
-        if des_frame is not None:
-            matches = bf.match(des_model, des_frame)
-            matches = sorted(matches, key=lambda x: x.distance)
-
-            status_text.text(f"Detected matches: {len(matches)}/{MIN_MATCHES} required")
-
-            if len(matches) > MIN_MATCHES:
-                src_pts = np.float32([kp_model[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-                dst_pts = np.float32([kp_frame[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-                homography, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-
-                if homography is not None:
-                    try:
-                        projection = projection_matrix(camera_parameters, homography)
-
-                        if st.session_state.overlay_type == "Object (3D Model)" and obj:
-                            frame_display = render(frame_display, obj, projection, model)
-                        
-                        elif st.session_state.overlay_type == "Photo" and st.session_state.uploaded_photo is not None:
-                            photo = Image.open(st.session_state.uploaded_photo)
-                            photo = np.array(photo)
-                            h, w, _ = photo.shape
-                            overlay_resized = cv2.resize(photo, (w, h))
-                            x_offset, y_offset = int(dst_pts[0][0][0]), int(dst_pts[0][0][1])
-                            frame_display[y_offset:y_offset + h, x_offset:x_offset + w] = overlay_resized
-                        
-                        elif st.session_state.overlay_type == "Video" and st.session_state.uploaded_video is not None:
-                            video_cap = cv2.VideoCapture(st.session_state.uploaded_video.name)
-                            ret_vid, video_frame = video_cap.read()
-                            if ret_vid:
-                                h, w, _ = video_frame.shape
-                                overlay_resized = cv2.resize(video_frame, (w, h))
-                                x_offset, y_offset = int(dst_pts[0][0][0]), int(dst_pts[0][0][1])
-                                frame_display[y_offset:y_offset + h, x_offset:x_offset + w] = overlay_resized
-                    
-                    except Exception as e:
-                        status_text.error(f"Error in rendering: {e}")
+    # Conditional options based on overlay type
+    if overlay_type == "3D":
+        st.markdown("### 3D Model Selection")
+        model_options = ["Default (Fox)"]
         
-        frame_rgb = cv2.cvtColor(frame_display, cv2.COLOR_BGR2RGB)
-        stframe.image(frame_rgb, channels="RGB", use_column_width=True)
+        # Check if models directory exists and add files
+        if os.path.exists("models"):
+            model_files = [f for f in os.listdir("models") if f.lower().endswith('.obj')]
+            model_options.extend(model_files)
         
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-    status_text.empty()
-    stframe.empty()
-    st.session_state.camera_active = False
-
-# Start/Stop Camera Button
-if st.button("Start Camera" if not st.session_state.camera_active else "Stop Camera"):
-    st.session_state.camera_active = not st.session_state.camera_active
+        model_selection = st.selectbox("Select 3D model", model_options)
+        
+        if model_selection == "Default (Fox)":
+            st.session_state.model_path = "models/fox.obj"
+        else:
+            st.session_state.model_path = os.path.join("models", model_selection)
+    
+    elif overlay_type == "IMAGE":
+        st.markdown("### Image Overlay")
+        uploaded_image = st.file_uploader("Upload image overlay", type=["jpg", "jpeg", "png"])
+        
+        if uploaded_image is not None:
+            # Save uploaded image to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_img:
+                tmp_img.write(uploaded_image.read())
+                image_path = tmp_img.name
+                st.session_state.temp_files.append(image_path)
+                st.session_state.image_path = image_path
+                st.image(image_path, caption="Your image overlay", width=200)
+    
+    elif overlay_type == "VIDEO":
+        st.markdown("### Video Overlay")
+        uploaded_video = st.file_uploader("Upload video overlay", type=["mp4", "mov", "avi"])
+        
+        if uploaded_video is not None:
+            # Save uploaded video to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_vid:
+                tmp_vid.write(uploaded_video.read())
+                video_path = tmp_vid.name
+                st.session_state.temp_files.append(video_path)
+                st.session_state.video_path = video_path
+                st.video(video_path, start_time=0)
+    
+    # AR Settings
+    st.markdown("### Settings")
+    st.session_state.min_matches = st.slider("Feature point matches", 5, 50, 10, 
+                                             help="Minimum matches required for detection")
+    
+    # Camera control
+    st.markdown("### Camera Control")
+    camera_button_label = "Stop Camera" if st.session_state.camera_active else "Start Camera"
+    if st.button(camera_button_label, key="camera_toggle"):
+        st.session_state.camera_active = not st.session_state.camera_active
+        if not st.session_state.camera_active:
+            st.experimental_rerun()
+    
+    # Capture image button
     if st.session_state.camera_active:
-        start_camera()
+        if st.button("📸 Capture Moment", key="capture_btn"):
+            st.session_state.capture_requested = True
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Main content area with camera feed and gallery
+with col2:
+    # Function to start the camera and run AR processing
+    def run_ar_camera():
+        # Check if reference path is set
+        if not hasattr(st.session_state, 'reference_path'):
+            st.error("Please select or upload a reference image")
+            st.session_state.camera_active = False
+            return
+        
+        # Load reference image
+        try:
+            reference_image = cv2.imread(st.session_state.reference_path, 0)
+            if reference_image is None:
+                st.error(f"Failed to load reference image: {st.session_state.reference_path}")
+                st.session_state.camera_active = False
+                return
+        except Exception as e:
+            st.error(f"Error loading reference image: {e}")
+            st.session_state.camera_active = False
+            return
+        
+        # Initialize AR components
+        camera_params = np.array([[800, 0, 320], [0, 800, 240], [0, 0, 1]])
+        orb = cv2.ORB_create(nfeatures=5000)
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        
+        # Get keypoints and descriptors for reference image
+        kp_model, des_model = orb.detectAndCompute(reference_image, None)
+        
+        # Load 3D model if required
+        obj = None
+        if st.session_state.overlay_type == "3D":
+            try:
+                obj = OBJ(st.session_state.model_path, swapyz=True)
+            except Exception as e:
+                st.error(f"Error loading 3D model: {e}")
+                st.session_state.camera_active = False
+                return
+        
+        # Load image overlay if required
+        image_overlay = None
+        if st.session_state.overlay_type == "IMAGE":
+            try:
+                image_overlay = cv2.imread(st.session_state.image_path)
+            except:
+                st.error("Failed to load image overlay")
+                st.session_state.camera_active = False
+                return
+        
+        # Load video if required
+        video_cap = None  
+        if st.session_state.overlay_type == "VIDEO":
+            try:
+                video_cap = cv2.VideoCapture(st.session_state.video_path)
+                if not video_cap.isOpened():
+                    st.error("Failed to open video file")
+                    st.session_state.camera_active = False
+                    return
+            except:
+                st.error("Failed to load video overlay")
+                st.session_state.camera_active = False
+                return
+        
+        # Initialize webcam
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            st.error("Could not open webcam")
+            st.session_state.camera_active = False
+            return
+        
+        # Create placeholder for camera feed
+        camera_placeholder = st.empty()
+        status_text = st.empty()
+        
+        # Initialize capture requested flag
+        if 'capture_requested' not in st.session_state:
+            st.session_state.capture_requested = False
+        
+        # Main processing loop
+        while st.session_state.camera_active:
+            ret, frame = cap.read()
+            if not ret:
+                st.error("Failed to capture frame from camera")
+                break
+            
+            # Process frame
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            kp_frame, des_frame = orb.detectAndCompute(gray_frame, None)
+            
+            # Match features
+            if des_frame is not None and len(des_frame) > 0:
+                matches = bf.match(des_model, des_frame)
+                matches = sorted(matches, key=lambda x: x.distance)
+                
+                # Display match count status
+                status_text.text(f"Detected matches: {len(matches)}/{st.session_state.min_matches} required")
+                
+                if len(matches) > st.session_state.min_matches:
+                    # Extract matched keypoints
+                    src_pts = np.float32([kp_model[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+                    dst_pts = np.float32([kp_frame[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+                    
+                    # Find homography matrix
+                    homography, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+                    
+                    if homography is not None:
+                        try:
+                            # Based on overlay type, render appropriate content
+                            if st.session_state.overlay_type == "3D":
+                                # For 3D model
+                                projection = projection_matrix(camera_params, homography)
+                                frame = render(frame, obj, projection, reference_image)
+                            
+                            elif st.session_state.overlay_type == "IMAGE" and image_overlay is not None:
+                                # For image overlay
+                                frame = overlay_image(frame, homography, image_overlay)
+                            
+                            elif st.session_state.overlay_type == "VIDEO" and video_cap is not None:
+                                # For video overlay
+                                ret_vid, video_frame = video_cap.read()
+                                # If video ends, loop back to beginning
+                                if not ret_vid:
+                                    video_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                                    ret_vid, video_frame = video_cap.read()
+                                
+                                if ret_vid:
+                                    frame = overlay_image(frame, homography, video_frame)
+                            
+                            # Draw reference image border
+                            h, w = reference_image.shape
+                            corners = np.float32([[0, 0], [0, h], [w, h], [w, 0]]).reshape(-1, 1, 2)
+                            corners_transformed = cv2.perspectiveTransform(corners, homography)
+                            frame = cv2.polylines(frame, [np.int32(corners_transformed)], True, (0, 255, 0), 2)
+                        
+                        except Exception as e:
+                            status_text.text(f"Error in rendering: {str(e)}")
+            
+            # Convert frame to RGB for display
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Handle capture request
+            if st.session_state.capture_requested:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                pil_img = Image.fromarray(frame_rgb)
+                st.session_state.captured_images.append((pil_img, timestamp))
+                st.session_state.capture_requested = False
+                
+                # Save captured image
+                if not os.path.exists("captures"):
+                    os.makedirs("captures")
+                image_path = os.path.join("captures", f"ar_capture_{timestamp}.jpg")
+                pil_img.save(image_path)
+                
+                # Show capture confirmation
+                status_text.success(f"Image captured successfully!")
+            
+            # Display the frame
+            camera_placeholder.image(frame_rgb, channels="RGB", caption="AR Camera Feed", use_column_width=True)
+        
+        # Clean up resources
+        cap.release()
+        if video_cap is not None:
+            video_cap.release()
+        cv2.destroyAllWindows()
+        camera_placeholder.empty()
+        status_text.empty()
+    
+    # Display camera feed if active
+    st.markdown('<div class="card view-container">', unsafe_allow_html=True)
+    
+    if st.session_state.camera_active:
+        st.subheader("📷 AR View")
+        run_ar_camera()
+    else:
+        st.subheader("AR Camera Feed")
+        st.info("Press 'Start Camera' in the control panel to begin the AR experience.")
+        
+        # Display example image of how to use
+        example_image_path = os.path.join("reference_images", "example.jpg") 
+        if os.path.exists(example_image_path):
+            st.image(example_image_path, caption="Example: Show your wedding card to the camera", use_column_width=True)
+        else:
+            st.markdown("""
+            1. Select a reference image (your wedding card design)
+            2. Choose what to display (3D model, image, or video)
+            3. Click 'Start Camera' to begin
+            4. Show your wedding card to the camera
+            5. Capture magical AR moments with the 'Capture' button
+            """)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Gallery of captured images
+    if st.session_state.captured_images:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("📸 Captured Moments")
+        
+        # Create columns for gallery
+        gallery_cols = st.columns(3)
+        for i, (img, timestamp) in enumerate(st.session_state.captured_images):
+            with gallery_cols[i % 3]:
+                st.image(img, caption=f"Captured: {timestamp}", use_column_width=True)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    # Download button
+                    buf = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+                    img.save(buf, format="JPEG")
+                    buf.close()
+                    with open(buf.name, "rb") as file:
+                        btn = st.download_button(
+                            label="Download",
+                            data=file,
+                            file_name=f"ar_wedding_{timestamp}.jpg",
+                            mime="image/jpeg",
+                            key=f"download_{i}"
+                        )
+                
+                with col2:
+                    # Delete button
+                    if st.button("Delete", key=f"delete_{i}"):
+                        st.session_state.captured_images.pop(i)
+                        st.experimental_rerun()
+        
+        # Clear all button
+        if st.button("Clear All Images", key="clear_gallery"):
+            st.session_state.captured_images = []
+            st.experimental_rerun()
+            
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Footer
+st.markdown("""
+<div style="text-align: center; margin-top: 30px; padding: 10px; color: #6C757D; font-size: 0.8rem;">
+    AR Wedding Card Experience | Create unforgettable memories
+</div>
+""", unsafe_allow_html=True)
+
+# Clean up temp files when app is closed
+def cleanup_temp_files():
+    for file_path in st.session_state.temp_files:
+        try:
+            if os.path.exists(file_path):
+                os.unlink(file_path)
+        except:
+            pass
+
+# Register cleanup function
+import atexit
+atexit.register(cleanup_temp_files)
