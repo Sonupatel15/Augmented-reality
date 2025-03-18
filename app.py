@@ -11,6 +11,7 @@ from datetime import datetime
 # Import AR backend functionality
 from objloader_simple import OBJ
 from ar_main import render, projection_matrix, overlay_image, MIN_MATCHES
+from video_overlay import warp_video_to_target, overlay_video_on_frame
 
 # Page configuration and styling
 st.set_page_config(
