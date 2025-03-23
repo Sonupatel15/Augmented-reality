@@ -1,4 +1,4 @@
-# AR Wedding Card Experience
+# AR Experience
 
 This project implements an Augmented Reality experience for wedding cards using OpenCV and Streamlit.
 
