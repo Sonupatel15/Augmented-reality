@@ -1,0 +1,27 @@
+# Core requirements
+streamlit==1.30.0
+opencv-python==4.8.1.78
+numpy==1.26.2
+Pillow==10.1.0
+scipy==1.11.4
+matplotlib==3.8.2
+imutils==0.5.4
+pyyaml==6.0.1
+
+# Additional requirements for 3D object handling
+PyOpenGL==3.1.7
+pyglet==2.0.10
+
+# For handling video overlays
+imageio==2.33.1
+imageio-ffmpeg==0.4.9
+
+# Feature detection (BRISK, SIFT, ORB support)
+opencv-contrib-python==4.8.1.78
+
+# Camera handling
+pyserial==3.5
+
+# Utility and debugging
+tqdm==4.66.2
+requests==2.31.0
