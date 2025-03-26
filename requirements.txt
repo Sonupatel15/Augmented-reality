@@ -1,6 +1,6 @@
 # Core requirements
 streamlit
-opencv-python
+opencv-python-headless
 opencv-contrib-python
 numpy
 Pillow
@@ -9,16 +9,13 @@ matplotlib
 imutils
 pyyaml
 
-# Additional requirements for 3D object handling
+# 3D Object Handling
 PyOpenGL
 pyglet
 
-# For handling video overlays
+# Video overlays
 imageio
 imageio-ffmpeg
-
-# Feature detection (BRISK, SIFT, ORB support)
-opencv-python-headless
 
 # Camera handling
 pyserial
@@ -41,18 +38,12 @@ GitPython
 idna
 Jinja2
 jsonschema
-jsonschema-specifications
 MarkupSafe
-narwhals
 packaging
 pandas
 protobuf
-pyarrow
-pydeck
 python-dateutil
 pytz
-referencing
-rpds-py
 six
 smmap
 tenacity
