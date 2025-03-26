@@ -1,7 +1,6 @@
 # Core requirements
 streamlit
 opencv-python-headless
-opencv-contrib-python
 numpy
 Pillow
 scipy
