@@ -1,6 +1,11 @@
 # AR Experience
 
-This project implements an Augmented Reality experience for wedding cards using OpenCV and Streamlit.
+AR Overlay Model is a real-time augmented reality system that dynamically projects 3D objects, images, or videos onto reference images captured by a camera. Using ORB feature detection and homography estimation, it accurately tracks the reference image in live video feeds and renders overlays with precise perspective alignment. The model supports OBJ files for 3D objects, image files (JPG/PNG), and video files (MP4/AVI), which are transformed using perspective warping to match the reference image's orientation and scale in real-time. This markerless solution performs all processing client-side with OpenCV and Streamlit, enabling instant AR visualization without requiring physical markers or specialized hardware.
+
+## Contributors
+
+* [@Sonupatel](https://github.com/Sonupatel15)
+* [@Harsha](https://github.com/harsha188-codes)
 
 ## Setup
 
