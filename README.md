@@ -18,3 +18,6 @@ Follow the instructions in the Streamlit app to upload reference images, 3D mode
 - `utils`: Utility functions.
 - `assets`: Assets like reference images, models, etc.
 - `streamlit_app.py`: Streamlit frontend.
+
+## Launch the Application
+`streamlit run streamlit_app.py`
